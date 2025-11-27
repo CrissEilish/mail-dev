@@ -1,45 +1,30 @@
-FROM php:8.2-fpm
+FROM dunglas/frankenphp
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
+ENV SERVER_NAME=:80
+ENV APP_ROOT=/app
+
+# Instalar dependencias necesarias para Laravel
+RUN install-php-extensions \
+    pdo_mysql \
+    gd \
+    intl \
     zip \
-    unzip \
-    libzip-dev \
-    libc-client-dev \
-    libkrb5-dev
+    opcache \
+    bcmath \
+    pcntl \
+    redis
 
-# Clear cache
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
+# Copiar el código
+COPY . /app
 
-# Configure IMAP extension
-RUN docker-php-ext-configure imap --with-kerberos --with-imap-ssl
-
-# Install PHP extensions
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip imap
-
-# Get latest Composer
+# Instalar Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
-WORKDIR /var/www
+# Instalar dependencias de PHP
+RUN composer install --no-dev --optimize-autoloader
 
-# Add user for laravel application
-RUN groupadd -g 1000 www
-RUN useradd -u 1000 -ms /bin/bash -g www www
+# Permisos
+RUN chown -R www-data:www-data /app/storage /app/bootstrap/cache
 
-# Copy existing application directory contents
-COPY . /var/www
-
-# Copy existing application directory permissions
-COPY --chown=www:www . /var/www
-
-# Change current user to www
-USER www
-
-EXPOSE 9000
-CMD ["php-fpm"]
+# Comando de inicio
+CMD ["php", "artisan", "octane:start", "--server=frankenphp", "--host=0.0.0.0", "--port=80"]
